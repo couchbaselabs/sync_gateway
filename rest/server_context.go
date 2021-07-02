@@ -1137,13 +1137,13 @@ func (sc *ServerContext) updateCalculatedStats() {
 
 }
 
-func initClusterAgent(clusterAddress, clusterUser, clusterPass, certPath, keyPath, caCertPath string, timeout time.Duration) (*gocbcore.Agent, error) {
+func initClusterAgent(clusterAddress, clusterUser, clusterPass, certPath, keyPath, caCertPath string, CACertUnsetTlsSkipVerify bool, timeout time.Duration) (*gocbcore.Agent, error) {
 	authenticator, err := base.GoCBCoreAuthConfig(clusterUser, clusterPass, certPath, keyPath)
 	if err != nil {
 		return nil, err
 	}
 
-	tlsRootCAProvider, err := base.GoCBCoreTLSRootCAProvider(caCertPath)
+	tlsRootCAProvider, err := base.GoCBCoreTLSRootCAProvider(CACertUnsetTlsSkipVerify, caCertPath)
 	if err != nil {
 		return nil, err
 	}
@@ -1191,9 +1191,9 @@ var tempConnectionDetailsForManagementEndpoints = func() (serverAddress string, 
 	return base.UnitTestUrl(), base.TestClusterUsername(), base.TestClusterPassword(), "", "", ""
 }
 
-func (sc *ServerContext) ObtainManagementEndpointsAndHTTPClient() ([]string, *http.Client, error) {
+func (sc *ServerContext) ObtainManagementEndpointsAndHTTPClient(CACertUnsetTlsSkipVerify bool) ([]string, *http.Client, error) {
 	clusterAddress, clusterUser, clusterPass, certPath, keyPath, caCertPath := tempConnectionDetailsForManagementEndpoints()
-	agent, err := initClusterAgent(clusterAddress, clusterUser, clusterPass, certPath, keyPath, caCertPath, sc.config.API.ServerReadTimeout.Duration)
+	agent, err := initClusterAgent(clusterAddress, clusterUser, clusterPass, certPath, keyPath, caCertPath, CACertUnsetTlsSkipVerify, sc.config.API.ServerReadTimeout.Duration)
 	if err != nil {
 		return nil, nil, err
 	}

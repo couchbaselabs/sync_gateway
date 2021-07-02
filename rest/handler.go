@@ -224,7 +224,7 @@ func (h *handler) invoke(method handlerMethod, accessPermissions []string, respo
 		if dbContext != nil {
 			managementEndpoints, httpClient, err = dbContext.ObtainManagementEndpointsAndHTTPClient()
 		} else {
-			managementEndpoints, httpClient, err = h.server.ObtainManagementEndpointsAndHTTPClient()
+			managementEndpoints, httpClient, err = h.server.ObtainManagementEndpointsAndHTTPClient(dbContext.BucketSpec.CACertUnsetTlsSkipVerify)
 		}
 		if err != nil {
 			base.Warnf("An error occurred whilst obtaining management endpoints: %v", err)
