@@ -416,7 +416,7 @@ func TestCheckPermissions(t *testing.T) {
 		},
 	}
 
-	ctx := NewServerContext(&StartupConfig{}, false)
+	ctx := NewServerContext(&StartupConfig{Unsupported: UnsupportedConfig{ServerTLSSkipVerify: base.BoolPtr(true)}}, false)
 	defer ctx.Close()
 
 	eps, httpClient, err := ctx.ObtainManagementEndpointsAndHTTPClient()
