@@ -221,7 +221,7 @@ func TestObtainManagementEndpointsFromServerContext(t *testing.T) {
 		t.Skip("Test requires Couchbase Server")
 	}
 
-	ctx := NewServerContext(&StartupConfig{}, false)
+	ctx := NewServerContext(&StartupConfig{Unsupported: UnsupportedConfig{ServerTLSSkipVerify: base.BoolPtr(true)}}, false)
 	defer ctx.Close()
 
 	eps, _, err := ctx.ObtainManagementEndpointsAndHTTPClient()
