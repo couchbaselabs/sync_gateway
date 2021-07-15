@@ -50,7 +50,7 @@ func serverMain(ctx context.Context, osArgs []string) error {
 	metricsInterfaceAuthFlag := fs.Bool("api.metrics_interface_authentication", true, "")
 
 	allowInsecureServerConnections := fs.Bool("bootstrap.allow_insecure_server_connections", false, "")
-	allowInsecureTLSConnections := fs.Bool("bootstrap.allow_insecure_tls_connections", false, "")
+	allowInsecureTLSConnections := fs.Bool("api.https.allow_insecure_tls_connections", false, "")
 
 	if err := fs.Parse(osArgs[1:]); err != nil {
 		// Return nil for ErrHelp so the shell exit code is 0
@@ -63,10 +63,8 @@ func serverMain(ctx context.Context, osArgs []string) error {
 	// TODO: Be removed in a future commit once flags are sorted
 	flagStartupConfig.API.AdminInterfaceAuthentication = adminInterfaceAuthFlag
 	flagStartupConfig.API.MetricsInterfaceAuthentication = metricsInterfaceAuthFlag
-
-	// Actually hook this up @Isaac
-	_ = allowInsecureServerConnections
-	_ = allowInsecureTLSConnections
+	flagStartupConfig.Bootstrap.AllowInsecureServerConnections = allowInsecureServerConnections
+	flagStartupConfig.API.HTTPS.AllowInsecureTLSConnections = allowInsecureTLSConnections
 
 	if *disablePersistentConfigFlag {
 		return legacyServerMain(osArgs, &flagStartupConfig)
