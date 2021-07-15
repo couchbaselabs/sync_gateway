@@ -318,9 +318,16 @@ func (sc *ServerContext) getOrAddDatabaseFromConfig(config DatabaseConfig, useEx
 	return dbContext, err
 }
 
-func GetBucketSpec(config *DbConfig) (spec base.BucketSpec, err error) {
+func GetBucketSpec(config *DbConfig, serverConfig *StartupConfig) (spec base.BucketSpec, err error) {
 
 	spec = config.MakeBucketSpec()
+
+	if serverConfig.Unsupported.ServerTLSSkipVerify != nil {
+		spec.TLSSkipVerify = *serverConfig.Unsupported.ServerTLSSkipVerify
+		if spec.TLSSkipVerify && spec.CACertPath != "" {
+			return base.BucketSpec{}, errors.New("cannot skip server TLS validation and use CA Cert")
+		}
+	}
 
 	if spec.BucketName == "" {
 		spec.BucketName = config.Name
@@ -349,7 +356,7 @@ func GetBucketSpec(config *DbConfig) (spec base.BucketSpec, err error) {
 func (sc *ServerContext) _getOrAddDatabaseFromConfig(config DatabaseConfig, useExisting bool) (context *db.DatabaseContext, err error) {
 
 	// Generate bucket spec and validate whether db already exists
-	spec, err := GetBucketSpec(&config.DbConfig)
+	spec, err := GetBucketSpec(&config.DbConfig, sc.config)
 	if err != nil {
 		return nil, err
 	}
@@ -1136,13 +1143,13 @@ func (sc *ServerContext) updateCalculatedStats() {
 
 }
 
-func initClusterAgent(clusterAddress, clusterUser, clusterPass, certPath, keyPath, caCertPath string, timeout time.Duration) (*gocbcore.Agent, error) {
+func initClusterAgent(clusterAddress, clusterUser, clusterPass, certPath, keyPath, caCertPath string, tlsSkipVerify *bool, timeout time.Duration) (*gocbcore.Agent, error) {
 	authenticator, err := base.GoCBCoreAuthConfig(clusterUser, clusterPass, certPath, keyPath)
 	if err != nil {
 		return nil, err
 	}
 
-	tlsRootCAProvider, err := base.GoCBCoreTLSRootCAProvider(caCertPath)
+	tlsRootCAProvider, err := base.GoCBCoreTLSRootCAProvider(tlsSkipVerify, caCertPath)
 	if err != nil {
 		return nil, err
 	}
@@ -1192,7 +1199,7 @@ var tempConnectionDetailsForManagementEndpoints = func() (serverAddress string, 
 
 func (sc *ServerContext) ObtainManagementEndpointsAndHTTPClient() ([]string, *http.Client, error) {
 	clusterAddress, clusterUser, clusterPass, certPath, keyPath, caCertPath := tempConnectionDetailsForManagementEndpoints()
-	agent, err := initClusterAgent(clusterAddress, clusterUser, clusterPass, certPath, keyPath, caCertPath, sc.config.API.ServerReadTimeout.Duration)
+	agent, err := initClusterAgent(clusterAddress, clusterUser, clusterPass, certPath, keyPath, caCertPath, sc.config.Unsupported.ServerTLSSkipVerify, sc.config.API.ServerReadTimeout.Duration)
 	if err != nil {
 		return nil, nil, err
 	}
