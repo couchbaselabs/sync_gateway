@@ -72,7 +72,7 @@ type BucketConfig struct {
 
 func (bc *BucketConfig) MakeBucketSpec() base.BucketSpec {
 
-	server := "http://localhost:8091"
+	server := "couchbases://localhost:8091"
 	bucketName := ""
 	tlsPort := 11207
 
@@ -809,6 +809,21 @@ func (config *StartupConfig) Serve(addr string, handler http.Handler) error {
 	)
 }
 
+// Validate insecure connections
+func (sc *StartupConfig) validateInsecureTLSConnection() (err error) {
+	// Validate SSL is provided if not allowing unsecure connections
+	if sc.API.HTTPS.AllowInsecureTLSConnections == nil || !*sc.API.HTTPS.AllowInsecureTLSConnections {
+		if sc.API.HTTPS.TLSKeyPath == "" || sc.API.HTTPS.TLSCertPath == "" {
+			return fmt.Errorf("a TLS key and cert path must be provided when not allowing insecure TLS connections")
+		}
+	} else { // Make sure TLS key and cert is not provided
+		if sc.API.HTTPS.TLSKeyPath != "" || sc.API.HTTPS.TLSCertPath != "" {
+			return fmt.Errorf("cannot use TLS and also use insecure TLS connections")
+		}
+	}
+	return nil
+}
+
 // ServerContext creates a new ServerContext given its configuration and performs the context validation.
 func setupServerContext(config *StartupConfig, persistentConfig bool) (*ServerContext, error) {
 	// Logging config will now have been loaded from command line
@@ -828,6 +843,11 @@ func setupServerContext(config *StartupConfig, persistentConfig bool) (*ServerCo
 	base.Infof(base.KeyAll, "Logging: Redaction level: %s", config.Logging.RedactionLevel)
 
 	if err := setGlobalConfig(config); err != nil {
+		return nil, err
+	}
+
+	if err := config.validateInsecureTLSConnection(); err != nil {
+		base.Errorf("Config: %v", err)
 		return nil, err
 	}
 

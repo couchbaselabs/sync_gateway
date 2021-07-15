@@ -889,7 +889,10 @@ func TestValidateServerContext(t *testing.T) {
 	tb2User, tb2Password, _ := tb2.BucketSpec.Auth.GetCredentials()
 
 	xattrs := base.TestUseXattrs()
-	config := &StartupConfig{}
+	config := &StartupConfig{
+		API:       APIConfig{HTTPS: HTTPSConfig{AllowInsecureTLSConnections: base.BoolPtr(true)}},
+		Bootstrap: BootstrapConfig{AllowInsecureServerConnections: base.BoolPtr(true)},
+	}
 	databases := DbConfigMap{
 		"db1": {
 			BucketConfig: BucketConfig{
@@ -1265,11 +1268,93 @@ func TestSetupServerContext(t *testing.T) {
 	defer base.SetUpTestLogging(base.LevelInfo, base.KeyAll)()
 	t.Run("Create server context with a valid configuration", func(t *testing.T) {
 		config := DefaultStartupConfig("")
+		config.API.HTTPS.AllowInsecureTLSConnections = base.BoolPtr(true)
 		sc, err := setupServerContext(&config, false)
 		require.NoError(t, err)
 		require.NotNil(t, sc)
 		sc.Close()
 	})
+}
+
+// CBG-1535
+func TestAllowInsecureTLSConnections(t *testing.T) {
+	defer base.SetUpTestLogging(base.LevelInfo, base.KeyAll)()
+	errorTLSNotProvided := "a TLS key and cert path must be provided when not allowing insecure TLS connections"
+	errorTLSProvidedButInsecure := "cannot use TLS and also use insecure TLS connections"
+	testCases := []struct {
+		name                        string
+		tlsKey                      bool
+		tlsCert                     bool
+		allowInsecureTLSConnections bool
+		expectError                 *string
+	}{
+		{
+			name:        "Nothing provided",
+			expectError: &errorTLSNotProvided,
+		},
+		{
+			name:                        "No TLS provided, Allowing Insecure",
+			allowInsecureTLSConnections: true,
+			expectError:                 nil,
+		},
+		{
+			name:        "TLS Key but no cert provided",
+			tlsKey:      true,
+			expectError: &errorTLSNotProvided,
+		},
+		{
+			name:        "TLS Cert but no key provided",
+			tlsCert:     true,
+			expectError: &errorTLSNotProvided,
+		},
+		{
+			name:        "TLS Cert and key provided",
+			tlsKey:      true,
+			tlsCert:     true,
+			expectError: nil,
+		},
+		{
+			name:                        "TLS Cert and key provided, and allowing insecure",
+			tlsKey:                      true,
+			tlsCert:                     true,
+			allowInsecureTLSConnections: true,
+			expectError:                 &errorTLSProvidedButInsecure,
+		},
+		{
+			name:                        "TLS Key but no cert provided, but allowing insecure",
+			tlsKey:                      true,
+			allowInsecureTLSConnections: true,
+			expectError:                 &errorTLSProvidedButInsecure,
+		},
+		{
+			name:                        "TLS cert but no key provided, but allowing insecure",
+			tlsKey:                      true,
+			allowInsecureTLSConnections: true,
+			expectError:                 &errorTLSProvidedButInsecure,
+		},
+	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			config := DefaultStartupConfig("")
+			config.API.HTTPS.AllowInsecureTLSConnections = &test.allowInsecureTLSConnections
+			if test.tlsKey {
+				config.API.HTTPS.TLSKeyPath = "test.key"
+			}
+			if test.tlsCert {
+				config.API.HTTPS.TLSCertPath = "test.cert"
+			}
+			sc, err := setupServerContext(&config, false)
+			if test.expectError != nil {
+				assert.Error(t, err)
+				assert.Equal(t, err.Error(), *test.expectError)
+				require.Nil(t, sc)
+			} else {
+				assert.NoError(t, err)
+				require.NotNil(t, sc)
+				sc.Close()
+			}
+		})
+	}
 }
 
 // missingJavaScriptFilePath represents a nonexistent JavaScript file path on the disk.

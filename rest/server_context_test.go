@@ -112,7 +112,9 @@ func TestAllDatabaseNames(t *testing.T) {
 	tb2 := base.GetTestBucket(t)
 	defer tb2.Close()
 
-	serverConfig := &StartupConfig{API: APIConfig{CORS: &CORSConfig{}, AdminInterface: DefaultAdminInterface}}
+	serverConfig := &StartupConfig{
+		Bootstrap: BootstrapConfig{AllowInsecureServerConnections: base.BoolPtr(true)},
+		API:       APIConfig{HTTPS: HTTPSConfig{AllowInsecureTLSConnections: base.BoolPtr(true)}, CORS: &CORSConfig{}, AdminInterface: DefaultAdminInterface}}
 	serverContext := NewServerContext(serverConfig, false)
 	defer serverContext.Close()
 
@@ -727,4 +729,106 @@ func TestAdminAuthWithX509(t *testing.T) {
 
 	_, _, err = checkAdminAuth("", base.TestClusterUsername(), base.TestClusterPassword(), httpClient, managementEndpoints, []string{"cluster!admin"}, nil)
 	assert.NoError(t, err)
+}
+
+func TestAllowInsecureServerConnections(t *testing.T) {
+	// Long test as has to wait for retry loop to fail
+	defer base.SetUpTestLogging(base.LevelInfo, base.KeyAll)()
+	errorMustBeSecure := "couchbase server URL must use secure protocol when disallowing insecure server connections. Current URL: %v"
+	errorAllowInsecureAndBeSecure := "couchbase server URL cannot use secure protocol while allowing insecure server connections. Current URL: %v"
+	testCases := []struct {
+		name                           string
+		allowInsecureServerConnections bool
+		server                         string
+		expectedError                  *string
+	}{
+		{
+			name:                           "Walrus allowed without flag",
+			allowInsecureServerConnections: false,
+			server:                         "walrus://",
+			expectedError:                  nil,
+		},
+		{
+			name:                           "Walrus allowed with flag",
+			allowInsecureServerConnections: true,
+			server:                         "walrus://",
+			expectedError:                  nil,
+		},
+		{
+			name:                           "couchbase: not allowed",
+			allowInsecureServerConnections: false,
+			server:                         "couchbase://localhost:1212",
+			expectedError:                  &errorMustBeSecure,
+		},
+		{
+			name:                           "http not allowed",
+			allowInsecureServerConnections: false,
+			server:                         "http://localhost:1212",
+			expectedError:                  &errorMustBeSecure,
+		},
+		{
+			name:                           "http allowed",
+			allowInsecureServerConnections: true,
+			server:                         "http://localhost:1212",
+			expectedError:                  nil,
+		},
+		{
+			name:                           "https mandatory",
+			allowInsecureServerConnections: false,
+			server:                         "https://localhost:1234",
+			expectedError:                  nil,
+		},
+		{
+			name:                           "Secure https not allowed",
+			allowInsecureServerConnections: true,
+			server:                         "https://localhost:1234",
+			expectedError:                  &errorAllowInsecureAndBeSecure,
+		},
+		{
+			name:                           "couchbases:",
+			allowInsecureServerConnections: false,
+			server:                         "couchbases://localhost:1234",
+			expectedError:                  nil,
+		},
+		{
+			name:                           "ftps:", // Testing if the S at the end is what makes it secure
+			allowInsecureServerConnections: false,
+			server:                         "ftps://localhost:1234",
+			expectedError:                  &errorMustBeSecure,
+		},
+	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			// Setup
+			config := DefaultStartupConfig("")
+			config.Bootstrap.AllowInsecureServerConnections = &test.allowInsecureServerConnections
+
+			config.API.HTTPS.AllowInsecureTLSConnections = base.BoolPtr(true)
+			sc := NewServerContext(&config, false)
+			databaseConfig := DatabaseConfig{
+				DbConfig: DbConfig{
+					Name: "test",
+					BucketConfig: BucketConfig{
+						Server:   &test.server,
+						Username: "test",
+						Password: "test",
+						Bucket:   base.StringPtr("test"),
+					},
+				},
+			}
+			// Run test
+			_, err := sc._getOrAddDatabaseFromConfig(databaseConfig, false)
+
+			if test.expectedError != nil {
+				assert.Error(t, err)
+				assert.Equal(t, fmt.Sprintf(*test.expectedError, test.server), err.Error())
+			} else {
+				// Will still error due to no DB name, or not being able to connect to bucket
+				// So make sure it's not the 2 errors that can happen due to secure protocol
+				assert.NotEqual(t, fmt.Sprintf(errorMustBeSecure, test.server), err)
+				assert.NotEqual(t, fmt.Sprintf(errorAllowInsecureAndBeSecure, test.server), err)
+			}
+			sc.Close()
+		})
+	}
 }
