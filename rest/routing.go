@@ -211,10 +211,6 @@ func CreateAdminRouter(sc *ServerContext) *mux.Router {
 		makeHandler(sc, adminPrivs, nil, nil, (*handler).handleExpvar)).Methods("GET")
 	r.Handle("/_config",
 		makeHandler(sc, adminPrivs, nil, nil, (*handler).handleGetConfig)).Methods("GET")
-	r.Handle("/_replicate",
-		makeOfflineHandler(sc, adminPrivs, nil, nil, (*handler).handleReplicate)).Methods("POST")
-	r.Handle("/_active_tasks",
-		makeOfflineHandler(sc, adminPrivs, nil, nil, (*handler).handleActiveTasks)).Methods("GET")
 
 	r.Handle("/_status",
 		makeHandler(sc, adminPrivs, nil, nil, (*handler).handleGetStatus)).Methods("GET")
