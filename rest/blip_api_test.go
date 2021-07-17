@@ -2622,7 +2622,6 @@ func TestBlipNonDeltaSyncPush(t *testing.T) {
 // TestBlipDeltaSyncNewAttachmentPull tests that adding a new attachment in SG and replicated via delta sync adds the attachment
 // to the temporary "allowedAttachments" map.
 func TestBlipDeltaSyncNewAttachmentPull(t *testing.T) {
-
 	defer base.SetUpTestLogging(base.LevelInfo, base.KeyAll)()
 
 	sgUseDeltas := base.IsEnterpriseEdition()
@@ -2856,6 +2855,7 @@ func TestBlipDeltaSyncPushAttachment(t *testing.T) {
 // 5. Update doc in the test client by adding another attachment
 // 6. Have that update pushed using delta sync via the continuous replication started in step 2
 func TestBlipDeltaSyncPushPullNewAttachment(t *testing.T) {
+	t.Skip("Skipping this test temporarily")
 	defer base.SetUpTestLogging(base.LevelInfo, base.KeyAll)()
 	if !base.IsEnterpriseEdition() {
 		t.Skip("Delta test requires EE")
